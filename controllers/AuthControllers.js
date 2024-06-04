@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const cloudinary = require("cloudinary").v2;
 const JWT_SECRET = "secretjwtstring";
+const axios = require('axios')
 require("dotenv").config();
 
 
