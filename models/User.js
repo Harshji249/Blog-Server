@@ -18,7 +18,11 @@ const userSchema = new mongoose.Schema({
     },
     likedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'blog' }],
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-    following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    slackAccessToken:{
+        type:String,
+        default:''
+    }
 })
 const user = mongoose.model("User", userSchema)
 user.createIndexes

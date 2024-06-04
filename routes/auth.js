@@ -32,9 +32,9 @@ router.post('/registeruser',upload.single('file'),[
 // Edit user profile : PUT "/api/auth/edituser"
 router.post('/edituser/:id',upload.single('file'), editUser)
 
-router.get('/slack', slackAuth)
+router.get('/slack', fetchuser,slackAuth)
 
-router.get('/slack/callback',oAuthCallback)
+router.put('/slack/callback',oAuthCallback)
 
 router.get('/slack/channels', fetchuser,getAllChannels)
 

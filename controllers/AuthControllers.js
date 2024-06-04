@@ -166,11 +166,6 @@ const oAuthCallback = async (req, res) => {
   }
 };
 
-// Implement this function to get the user ID from the auth token
-const getUserIdFromAuthToken = (authToken) => {
-  const data = jwt.verify(authToken, JWT_SECRET);
-  return data.user;
-};
 
 const getAllChannels =  async (req, res) => {
   try {
