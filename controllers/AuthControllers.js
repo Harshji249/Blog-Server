@@ -12,6 +12,10 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+const CLIENT_ID = "7220419783171.7233242366609";
+const CLIENT_SECRET = 'c4bd8a8acdfa976925f660a1dfd4b19b';
+const REDIRECT_URI = 'https://blog-server-g55n.onrender.com/api/auth/slack/callback';
+
 const loginUser = async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -127,7 +131,11 @@ const editUser = async (req, res) => {
 };
 
 const slackAuth =(req,res)=>{
+  console.log('hello')
   const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${CLIENT_ID}&scope=channels:read,chat:write&redirect_uri=${REDIRECT_URI}`;
+  console.log('URL CREATED',slackAuthUrl)
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.redirect(slackAuthUrl);
 }
 
@@ -144,7 +152,7 @@ const oAuthCallback =async (req, res) => {
     });
 
     const accessToken = response.data.access_token;
-    const userId = req.user.id; // Assuming user is authenticated and user ID is available in req.user.id
+    const userId = req.user.id;
 
     // Store access token with user info in the database
     await User.findByIdAndUpdate(userId, { slackAccessToken: accessToken });

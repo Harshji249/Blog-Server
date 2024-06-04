@@ -34,7 +34,7 @@ router.post('/edituser/:id',upload.single('file'), editUser)
 
 router.get('/slack', slackAuth)
 
-router.get('/slack/callback', fetchuser,oAuthCallback)
+router.get('/slack/callback',oAuthCallback)
 
 router.get('/slack/channels', fetchuser,getAllChannels)
 
