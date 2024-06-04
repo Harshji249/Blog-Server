@@ -154,8 +154,10 @@ const oAuthCallback = async (req, res) => {
       throw new Error(response.data.error);
     }
 
+    console.log('Response',response)
     const accessToken = response.data.access_token;
     // Store access token with user info in the database
+    console.log('Access TOken',accessToken)
     await User.findByIdAndUpdate(state, { slackAccessToken: accessToken });
     res.send('Slack account connected successfully!');
   } catch (error) {
