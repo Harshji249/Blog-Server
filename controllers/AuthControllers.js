@@ -133,17 +133,12 @@ const editUser = async (req, res) => {
 };
 
 const slackAuth = (req, res) => {
-  console.log('hello')
   const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${CLIENT_ID}&scope=channels:read,chat:write&redirect_uri=${REDIRECT_URI}&state=${req.user.id}`;
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
   res.json({ redirectUrl: slackAuthUrl });
 }
 
 const oAuthCallback = async (req, res) => {
-  const { code, state } = req.query;
-  const authToken = state; // Retrieve the auth token from the state parameter
+  const { code, state } = req.query; // Retrieve the auth token from the state parameter
 
   try {
     const response = await axios.post('https://slack.com/api/oauth.v2.access', null, {
@@ -155,10 +150,13 @@ const oAuthCallback = async (req, res) => {
       },
     });
 
-    console.log('RESPONSE TEST',response)
+    if (!response.data.ok) {
+      throw new Error(response.data.error);
+    }
+
     const accessToken = response.data.access_token;
     // Store access token with user info in the database
-    await User.findByIdAndUpdate(authToken, { slackAccessToken: accessToken });
+    await User.findByIdAndUpdate(state, { slackAccessToken: accessToken });
     res.send('Slack account connected successfully!');
   } catch (error) {
     console.error('Error during Slack OAuth:', error);
@@ -187,6 +185,7 @@ const setChannel =async (req, res) => {
   try {
     const { channelId } = req.body;
     const userId = req.user.id;
+    console.log(channelId,userId)
     await User.findByIdAndUpdate(userId, { slackChannelId: channelId });
     res.send('Slack channel set successfully!');
   } catch (error) {
@@ -195,16 +194,31 @@ const setChannel =async (req, res) => {
   }
 }
 
+
 const sendSlackNotification = async (userId, message) => {
   try {
     const user = await User.findById(userId);
+    console.log('User:', user);
+    console.log('Message:', message);
+
     if (user.slackAccessToken && user.slackChannelId) {
-      await axios.post('https://slack.com/api/chat.postMessage', {
+      const response = await axios.post('https://slack.com/api/chat.postMessage', {
         channel: user.slackChannelId,
         text: message,
       }, {
         headers: { Authorization: `Bearer ${user.slackAccessToken}` },
       });
+
+      // Check Slack API response
+      console.log('Slack API response:', response.data);
+
+      if (!response.data.ok) {
+        console.error('Slack API error:', response.data.error);
+      } else {
+        console.log('Message posted successfully:', response.data);
+      }
+    } else {
+      console.error('Missing Slack access token or channel ID');
     }
   } catch (error) {
     console.error('Error sending Slack notification:', error);
@@ -221,5 +235,5 @@ module.exports = {
   oAuthCallback,
   getAllChannels,
   setChannel,
-  sendSlackNotification
+  sendSlackNotification,
 };

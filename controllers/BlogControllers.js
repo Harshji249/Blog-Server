@@ -3,7 +3,7 @@ const User = require("../models/User");
 const Like = require("../models/Like");
 const Comment = require("../models/Comment");
 const { validationResult } = require("express-validator");
-const {sendSlackNotification} = require('./AuthControllers')
+const {sendSlackNotification,inviteBotToChannel} = require('./AuthControllers')
 
 const addNewPost = async (req, res) => {
   const errors = validationResult(req);

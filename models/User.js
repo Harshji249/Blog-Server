@@ -22,7 +22,12 @@ const userSchema = new mongoose.Schema({
     slackAccessToken:{
         type:String,
         default:''
+    },
+    slackChannelId:{
+        type:String,
+        default:''
     }
+
 })
 const user = mongoose.model("User", userSchema)
 user.createIndexes
