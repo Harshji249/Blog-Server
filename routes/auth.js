@@ -2,7 +2,8 @@ const express = require('express')
 const router = express.Router()
 const { body } = require('express-validator');
 const multer = require('multer');
-const { loginUser,createUser,editUser } = require('../controllers/AuthControllers');
+const fetchuser = require('../middleware/fetchuser');
+const { loginUser,createUser,editUser ,slackAuth, oAuthCallback,getAllChannels,setChannel} = require('../controllers/AuthControllers');
 const path = require('path');
 const destinationPath = path.join(__dirname, '../public/images');
 const storage = multer.diskStorage({
@@ -30,6 +31,15 @@ router.post('/registeruser',upload.single('file'),[
 
 // Edit user profile : PUT "/api/auth/edituser"
 router.post('/edituser/:id',upload.single('file'), editUser)
+
+router.get('/slack', slackAuth)
+
+router.get('/slack/callback', fetchuser,oAuthCallback)
+
+router.get('/slack/channels', fetchuser,getAllChannels)
+
+router.post('/slack/set-channel', fetchuser,setChannel)
+
 
 
 

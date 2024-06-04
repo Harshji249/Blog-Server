@@ -126,8 +126,88 @@ const editUser = async (req, res) => {
   }
 };
 
+const slackAuth =(req,res)=>{
+  const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${CLIENT_ID}&scope=channels:read,chat:write&redirect_uri=${REDIRECT_URI}`;
+  res.redirect(slackAuthUrl);
+}
+
+const oAuthCallback =async (req, res) => {
+  const { code } = req.query;
+  try {
+    const response = await axios.post('https://slack.com/api/oauth.v2.access', null, {
+      params: {
+        client_id: CLIENT_ID,
+        client_secret: CLIENT_SECRET,
+        code,
+        redirect_uri: REDIRECT_URI,
+      },
+    });
+
+    const accessToken = response.data.access_token;
+    const userId = req.user.id; // Assuming user is authenticated and user ID is available in req.user.id
+
+    // Store access token with user info in the database
+    await User.findByIdAndUpdate(userId, { slackAccessToken: accessToken });
+    res.send('Slack account connected successfully!');
+  } catch (error) {
+    console.error('Error during Slack OAuth:', error);
+    res.status(500).send('Error connecting Slack account');
+  }
+};
+
+const getAllChannels =  async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    const response = await axios.get('https://slack.com/api/conversations.list', {
+      headers: { Authorization: `Bearer ${user.slackAccessToken}` },
+    });
+
+    const channels = response.data.channels;
+    res.json(channels);
+  } catch (error) {
+    console.error('Error fetching Slack channels:', error);
+    res.status(500).send('Error fetching Slack channels');
+  }
+}
+
+const setChannel =async (req, res) => {
+  try {
+    const { channelId } = req.body;
+    const userId = req.user.id;
+    await User.findByIdAndUpdate(userId, { slackChannelId: channelId });
+    res.send('Slack channel set successfully!');
+  } catch (error) {
+    console.error('Error setting Slack channel:', error);
+    res.status(500).send('Error setting Slack channel');
+  }
+}
+
+const sendSlackNotification = async (userId, message) => {
+  try {
+    const user = await User.findById(userId);
+    if (user.slackAccessToken && user.slackChannelId) {
+      await axios.post('https://slack.com/api/chat.postMessage', {
+        channel: user.slackChannelId,
+        text: message,
+      }, {
+        headers: { Authorization: `Bearer ${user.slackAccessToken}` },
+      });
+    }
+  } catch (error) {
+    console.error('Error sending Slack notification:', error);
+  }
+};
+
+
+
 module.exports = {
   loginUser,
   createUser,
   editUser,
+  slackAuth,
+  oAuthCallback,
+  getAllChannels,
+  setChannel,
+  sendSlackNotification
 };

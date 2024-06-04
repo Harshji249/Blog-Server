@@ -3,6 +3,7 @@ const User = require("../models/User");
 const Like = require("../models/Like");
 const Comment = require("../models/Comment");
 const { validationResult } = require("express-validator");
+const {sendSlackNotification} = require('./AuthControllers')
 
 const addNewPost = async (req, res) => {
   const errors = validationResult(req);
@@ -19,36 +20,64 @@ const addNewPost = async (req, res) => {
 
     const savedBlog = await blog.save();
 
-    return res
-      .json({ status:200,savedBlog, message: "Blog Posted Successfully" });
+    // Notify followers
+    const author = await User.findById(req.user.id).populate('followers');
+    const notificationMessage = `An author you follow has published a new blog: ${title}`;
+
+    for (const follower of author.followers) {
+      sendSlackNotification(follower._id, notificationMessage);
+    }
+
+    return res.json({
+      status: 200,
+      savedBlog,
+      message: "Blog Posted Successfully",
+    });
   } catch (err) {
+    console.error('Error posting blog:', err);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
-
 const viewAllPost = async (req, res) => {
-    try {
-      const blogs = await Blog.find().populate({
+  try {
+    const currentUserId = req.user.id;
+
+    // Fetch the current user's following list
+    const currentUser = await User.findById(currentUserId).select("following");
+
+    // Fetch all blogs and populate required fields
+    const blogs = await Blog.find()
+      .populate({
         path: "user",
-        select: "name email file", // Include only the name field of the user
-      }).populate({
+        select: "name email file",
+      })
+      .populate({
         path: "comments",
         populate: {
           path: "userId",
           select: "name email file",
         },
       });
-  
-      res.json({status :200,
-        message: "All blogs listed successfully",
-        blogs,
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).send("Internal server error occurred");
-    }
-  };
-  
+
+    // Add a flag to indicate if the current user follows the author of each blog
+    const blogsWithFollowInfo = blogs.map((blog) => {
+      const isFollowing = currentUser.following.includes(blog.user._id);
+      return {
+        ...blog.toObject(),
+        isFollowing,
+      };
+    });
+
+    res.json({
+      status: 200,
+      message: "All blogs listed successfully",
+      blogs: blogsWithFollowInfo,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Internal server error occurred");
+  }
+};
 
 const viewUserPost = async (req, res) => {
   try {
@@ -60,11 +89,39 @@ const viewUserPost = async (req, res) => {
       },
     });
 
+
+    const userFollow = await User.findById(req.params.id).select('followers following');
+
+    let userWithFollowers;
+    try {
+      userWithFollowers = await User.populate(userFollow, {
+        path: 'followers',
+        select: 'name email file'
+      });
+    } catch (populateError) {
+      console.error('Error populating followers:', populateError);
+      return res.status(500).send(`Error populating followers: ${populateError.message}`);
+    }
+
+    let userWithFollowing;
+    try {
+      userWithFollowing = await User.populate(userWithFollowers, {
+        path: 'following',
+        select: 'name email file'
+      });
+      console.log('Following populated:', userWithFollowing.following);
+    } catch (populateError) {
+      console.error('Error populating following:', populateError);
+      return res.status(500).send(`Error populating following: ${populateError.message}`);
+    }
+
     const user = await User.findById(req.params.id);
     res.status(200).json({
       message: "User blogs listed successfully",
       blogs,
       user,
+      followers: userWithFollowing.followers,
+      following: userWithFollowing.following
     });
   } catch (err) {
     res.status(500).send("Internal server error occured");
@@ -72,24 +129,54 @@ const viewUserPost = async (req, res) => {
 };
 
 const viewMyPost = async (req, res) => {
-    try {
-      const blogs = await Blog.find({ user: req.user.id }).populate({
-        path: "comments",
-        populate: {
-          path: "userId",
-          select: "name email file",
-        },
-      });
-  
-      res.status(200).json({
-        message: "User blogs listed successfully",
-        blogs,
-      });
-    } catch (err) {
-      res.status(500).send("Internal server error occured");
-    }
-  };
+  try {
+    const userId = req.user.id;
+    console.log('Current User ID:', userId);
 
+    const blogs = await Blog.find({ user: userId }).populate({
+      path: "comments",
+      populate: {
+        path: "userId",
+        select: "name email file",
+      },
+    });
+
+    const user = await User.findById(userId).select('followers following');
+
+    let userWithFollowers;
+    try {
+      userWithFollowers = await User.populate(user, {
+        path: 'followers',
+        select: 'name email file'
+      });
+    } catch (populateError) {
+      console.error('Error populating followers:', populateError);
+      return res.status(500).send(`Error populating followers: ${populateError.message}`);
+    }
+
+    let userWithFollowing;
+    try {
+      userWithFollowing = await User.populate(userWithFollowers, {
+        path: 'following',
+        select: 'name email file'
+      });
+      console.log('Following populated:', userWithFollowing.following);
+    } catch (populateError) {
+      console.error('Error populating following:', populateError);
+      return res.status(500).send(`Error populating following: ${populateError.message}`);
+    }
+
+    res.status(200).json({
+      message: "User blogs listed successfully",
+      blogs,
+      followers: userWithFollowing.followers,
+      following: userWithFollowing.following
+    });
+  } catch (err) {
+    console.error('Error occurred:', err);
+    res.status(500).send("Internal server error occurred");
+  }
+};
 
 const updatePost = async (req, res) => {
   const errors = validationResult(req);
@@ -97,8 +184,8 @@ const updatePost = async (req, res) => {
     return res.status(400).json({ errors: errors.array() });
   }
   try {
-    const  title= req.body.payload.title;
-    const  description= req.body.payload.description;
+    const title = req.body.payload.title;
+    const description = req.body.payload.description;
     const updateBlog = {};
     if (title) updateBlog.title = title;
     if (description) updateBlog.description = description;
@@ -155,13 +242,55 @@ const addComment = async (req, res) => {
     const blogId = req.params.id;
     const userId = req.user.id;
     const { content } = req.body;
+
     const comment = new Comment({ blogId, userId, content });
     const commentAdded = await comment.save();
 
     await Blog.findByIdAndUpdate(blogId, { $push: { comments: comment._id } });
-    return res.status(200).json({ message: "Post Liked", commentAdded });
+
+    const blog = await Blog.findById(blogId).populate('user');
+    const blogOwner = blog.user;
+
+    const notificationMessage = `Your blog "${blog.title}" has received a new comment: ${content}`;
+    sendSlackNotification(blogOwner._id, notificationMessage);
+
+    return res.status(200).json({ message: "Comment added successfully", commentAdded });
   } catch (err) {
+    console.error('Error adding comment:', err);
     return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+const followUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const currentUser = req.user.id;
+
+    // Find the user to follow/unfollow
+    const userToFollow = await User.findById(id);
+    if (!userToFollow) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isFollowing = await User.findOne({ _id: currentUser, following: id });
+
+    if (isFollowing) {
+      // If already following, unfollow
+      await User.findByIdAndUpdate(currentUser, { $pull: { following: id } });
+      await User.findByIdAndUpdate(id, { $pull: { followers: currentUser } });
+      return res.json({ status: 200, message: "Unfollow successful" });
+    } else {
+      // If not following, follow
+      await User.findByIdAndUpdate(currentUser, {
+        $addToSet: { following: id },
+      });
+      await User.findByIdAndUpdate(id, {
+        $addToSet: { followers: currentUser },
+      });
+      return res.json({ status: 200, message: "Follow successful" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -173,5 +302,6 @@ module.exports = {
   deletePost,
   likePost,
   addComment,
-  viewMyPost
+  viewMyPost,
+  followUser,
 };

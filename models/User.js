@@ -17,6 +17,8 @@ const userSchema = new mongoose.Schema({
         required: true
     },
     likedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'blog' }],
+    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 })
 const user = mongoose.model("User", userSchema)
 user.createIndexes
