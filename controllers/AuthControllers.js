@@ -134,7 +134,7 @@ const editUser = async (req, res) => {
 
 const slackAuth = (req, res) => {
   console.log('hello')
-  const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${CLIENT_ID}&scope=channels:read,chat:write&redirect_uri=${REDIRECT_URI}&state=${req.headers.authorization}`;
+  const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${CLIENT_ID}&scope=channels:read,chat:write&redirect_uri=${REDIRECT_URI}&state=${req.user.id}`;
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
@@ -155,11 +155,10 @@ const oAuthCallback = async (req, res) => {
       },
     });
 
+    console.log('RESPONSE TEST',response)
     const accessToken = response.data.access_token;
-    const userId = getUserIdFromAuthToken(authToken); // Implement this function to get the user ID from the auth token
-console.log('USER ID',userId)
     // Store access token with user info in the database
-    await User.findByIdAndUpdate(userId, { slackAccessToken: accessToken });
+    await User.findByIdAndUpdate(authToken, { slackAccessToken: accessToken });
     res.send('Slack account connected successfully!');
   } catch (error) {
     console.error('Error during Slack OAuth:', error);
