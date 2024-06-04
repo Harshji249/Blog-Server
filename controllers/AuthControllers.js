@@ -6,6 +6,7 @@ const cloudinary = require("cloudinary").v2;
 const JWT_SECRET = "secretjwtstring";
 require("dotenv").config();
 
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -130,17 +131,19 @@ const editUser = async (req, res) => {
   }
 };
 
-const slackAuth =(req,res)=>{
+const slackAuth = (req, res) => {
   console.log('hello')
-  const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${CLIENT_ID}&scope=channels:read,chat:write&redirect_uri=${REDIRECT_URI}`;
-  console.log('URL CREATED',slackAuthUrl)
+  const slackAuthUrl = `https://slack.com/oauth/v2/authorize?client_id=${CLIENT_ID}&scope=channels:read,chat:write&redirect_uri=${REDIRECT_URI}&state=${req.headers.authorization}`;
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.redirect(slackAuthUrl);
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE');
+  res.header('Access-Control-Allow-Headers', 'Content-Type');
+  res.json({ redirectUrl: slackAuthUrl });
 }
 
-const oAuthCallback =async (req, res) => {
-  const { code } = req.query;
+const oAuthCallback = async (req, res) => {
+  const { code, state } = req.query;
+  const authToken = state; // Retrieve the auth token from the state parameter
+
   try {
     const response = await axios.post('https://slack.com/api/oauth.v2.access', null, {
       params: {
@@ -152,8 +155,8 @@ const oAuthCallback =async (req, res) => {
     });
 
     const accessToken = response.data.access_token;
-    const userId = req.user.id;
-
+    const userId = getUserIdFromAuthToken(authToken); // Implement this function to get the user ID from the auth token
+console.log('USER ID',userId)
     // Store access token with user info in the database
     await User.findByIdAndUpdate(userId, { slackAccessToken: accessToken });
     res.send('Slack account connected successfully!');
@@ -161,6 +164,12 @@ const oAuthCallback =async (req, res) => {
     console.error('Error during Slack OAuth:', error);
     res.status(500).send('Error connecting Slack account');
   }
+};
+
+// Implement this function to get the user ID from the auth token
+const getUserIdFromAuthToken = (authToken) => {
+  const data = jwt.verify(authToken, JWT_SECRET);
+  return data.user;
 };
 
 const getAllChannels =  async (req, res) => {
