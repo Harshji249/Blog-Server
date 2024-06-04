@@ -144,11 +144,6 @@ const oAuthCallback = async (req, res) => {
   console.log('OAuth Callback - state (user ID):', state);
   console.log('OAuth Callback - code:', code);
 
-  // Validate if state is a valid ObjectId
-  if (!mongoose.Types.ObjectId.isValid(state)) {
-    return res.status(400).send('Invalid user ID format');
-  }
-
   try {
     // Make the request to Slack API to get the access token
     const response = await axios.post('https://slack.com/api/oauth.v2.access', null, {
