@@ -138,9 +138,19 @@ const slackAuth = (req, res) => {
 }
 
 const oAuthCallback = async (req, res) => {
-  const { code, state } = req.query; // Retrieve the auth token from the state parameter
+  const { code, state } = req.query; // Retrieve the code and state (user ID)
+
+  // Log the incoming state and code for debugging
+  console.log('OAuth Callback - state (user ID):', state);
+  console.log('OAuth Callback - code:', code);
+
+  // Validate if state is a valid ObjectId
+  if (!mongoose.Types.ObjectId.isValid(state)) {
+    return res.status(400).send('Invalid user ID format');
+  }
 
   try {
+    // Make the request to Slack API to get the access token
     const response = await axios.post('https://slack.com/api/oauth.v2.access', null, {
       params: {
         client_id: CLIENT_ID,
@@ -150,22 +160,30 @@ const oAuthCallback = async (req, res) => {
       },
     });
 
+    // Check if the response from Slack is not okay
     if (!response.data.ok) {
       throw new Error(response.data.error);
     }
 
-    console.log('Response',response)
+    // Extract access token from the response
     const accessToken = response.data.access_token;
-    // Store access token with user info in the database
-    console.log('Access TOken',accessToken)
-    await User.findByIdAndUpdate(state, { slackAccessToken: accessToken });
+    console.log('OAuth Callback - Slack access token:', accessToken);
+
+    // Update the user's slackAccessToken in the database
+    const updatedUser = await User.findByIdAndUpdate(state, { slackAccessToken: accessToken }, { new: true });
+
+    // Check if the user was updated
+    if (!updatedUser) {
+      return res.status(404).send('User not found');
+    }
+
+    // Respond with success message
     res.send('Slack account connected successfully!');
   } catch (error) {
-    console.error('Error during Slack OAuth:', error);
+    console.error('Error during Slack OAuth:', error.message);
     res.status(500).send('Error connecting Slack account');
   }
 };
-
 
 const getAllChannels =  async (req, res) => {
   try {
