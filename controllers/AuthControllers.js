@@ -14,8 +14,8 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const CLIENT_ID = "7220419783171.7233242366609";
-const CLIENT_SECRET = 'c4bd8a8acdfa976925f660a1dfd4b19b';
+const CLIENT_ID = "7220419783171.7216518526950";
+const CLIENT_SECRET = 'f083f69a8908f9554df908a34b5d8439';
 const REDIRECT_URI = 'https://blog-server-g55n.onrender.com/api/auth/slack/callback';
 
 const loginUser = async (req, res) => {
