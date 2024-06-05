@@ -2,7 +2,7 @@ const express = require('express')
 const router = express.Router()
 const { body } = require('express-validator');
 const fetchuser = require('../middleware/fetchuser');
-const { addNewPost,viewAllPost,viewUserPost,updatePost,deletePost,likePost,addComment, viewMyPost,followUser } = require('../controllers/BlogControllers');
+const { addNewPost,viewAllPost,viewUserPost,updatePost,deletePost,likePost,addComment, viewMyPost,followUser, getFollowersAndFollowing } = require('../controllers/BlogControllers');
 
 //Create a new blog post: POST "/api/blog/addnewpost" 
 router.post('/addnewpost',[
@@ -35,5 +35,8 @@ router.post('/addcomment/:id',fetchuser,addComment)
 
 // Follow a user profile : POST "/api/blog/follow"
 router.post('/follow/:id',fetchuser, followUser)
+
+// Fetch followers and followings of a user : GET "/api/blog/followdetails"
+router.get('/followdetails',fetchuser, getFollowersAndFollowing)
 
 module.exports = router

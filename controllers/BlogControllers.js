@@ -20,9 +20,8 @@ const addNewPost = async (req, res) => {
 
     const savedBlog = await blog.save();
 
-    // Notify followers
     const author = await User.findById(req.user.id).populate('followers');
-    const notificationMessage = `An author you follow has published a new blog: ${title}`;
+    const notificationMessage = `${author.name} has published a new blog: ${title}`;
 
     for (const follower of author.followers) {
       sendSlackNotification(follower._id, notificationMessage);
@@ -38,14 +37,13 @@ const addNewPost = async (req, res) => {
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };
+
 const viewAllPost = async (req, res) => {
   try {
     const currentUserId = req.user.id;
 
-    // Fetch the current user's following list
     const currentUser = await User.findById(currentUserId).select("following");
 
-    // Fetch all blogs and populate required fields
     const blogs = await Blog.find()
       .populate({
         path: "user",
@@ -59,7 +57,6 @@ const viewAllPost = async (req, res) => {
         },
       });
 
-    // Add a flag to indicate if the current user follows the author of each blog
     const blogsWithFollowInfo = blogs.map((blog) => {
       const isFollowing = currentUser.following.includes(blog.user._id);
       return {
@@ -109,7 +106,6 @@ const viewUserPost = async (req, res) => {
         path: 'following',
         select: 'name email file'
       });
-      console.log('Following populated:', userWithFollowing.following);
     } catch (populateError) {
       console.error('Error populating following:', populateError);
       return res.status(500).send(`Error populating following: ${populateError.message}`);
@@ -131,7 +127,6 @@ const viewUserPost = async (req, res) => {
 const viewMyPost = async (req, res) => {
   try {
     const userId = req.user.id;
-    console.log('Current User ID:', userId);
 
     const blogs = await Blog.find({ user: userId }).populate({
       path: "comments",
@@ -141,7 +136,7 @@ const viewMyPost = async (req, res) => {
       },
     });
 
-    const user = await User.findById(userId).select('followers following');
+    const user = await User.findById(userId).select('followers following slackChannelId');
 
     let userWithFollowers;
     try {
@@ -160,7 +155,6 @@ const viewMyPost = async (req, res) => {
         path: 'following',
         select: 'name email file'
       });
-      console.log('Following populated:', userWithFollowing.following);
     } catch (populateError) {
       console.error('Error populating following:', populateError);
       return res.status(500).send(`Error populating following: ${populateError.message}`);
@@ -170,7 +164,8 @@ const viewMyPost = async (req, res) => {
       message: "User blogs listed successfully",
       blogs,
       followers: userWithFollowing.followers,
-      following: userWithFollowing.following
+      following: userWithFollowing.following,
+      slackChannelId: userWithFollowing.slackChannelId
     });
   } catch (err) {
     console.error('Error occurred:', err);
@@ -266,7 +261,6 @@ const followUser = async (req, res) => {
     const { id } = req.params;
     const currentUser = req.user.id;
 
-    // Find the user to follow/unfollow
     const userToFollow = await User.findById(id);
     if (!userToFollow) {
       return res.status(404).json({ message: "User not found" });
@@ -275,12 +269,10 @@ const followUser = async (req, res) => {
     const isFollowing = await User.findOne({ _id: currentUser, following: id });
 
     if (isFollowing) {
-      // If already following, unfollow
       await User.findByIdAndUpdate(currentUser, { $pull: { following: id } });
       await User.findByIdAndUpdate(id, { $pull: { followers: currentUser } });
       return res.json({ status: 200, message: "Unfollow successful" });
     } else {
-      // If not following, follow
       await User.findByIdAndUpdate(currentUser, {
         $addToSet: { following: id },
       });
@@ -294,6 +286,27 @@ const followUser = async (req, res) => {
   }
 };
 
+const getFollowersAndFollowing = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId)
+      .populate('followers', 'name email file')
+      .populate('following', 'name email file');
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      followers: user.followers,
+      following: user.following,
+    });
+  } catch (error) {
+    console.error('Error fetching followers and following:', error);
+    res.status(500).send('Internal server error occurred');
+  }
+};
 module.exports = {
   addNewPost,
   viewAllPost,
@@ -304,4 +317,5 @@ module.exports = {
   addComment,
   viewMyPost,
   followUser,
+  getFollowersAndFollowing
 };
